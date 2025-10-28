@@ -155,8 +155,8 @@ void Anders_Clear(struct Anders *a, uint8_t r, uint8_t g, uint8_t b)
     }
 }
 
-void Anders_Frame(struct Anders *a)
-{   
+static void _Anders_PrepareRawPixelBuffer(struct Anders *a)
+{
     uint8_t *pixelPointer = a->_rawPixelBuffer;
     for(int32_t y = a->_height - 1; y >= 0; y--) // BMP stores data bottom up
     {
@@ -179,6 +179,11 @@ void Anders_Frame(struct Anders *a)
             pixelPointer += a->_PADDING_BYTES;
         }
     }
+}
+
+void Anders_Frame(struct Anders *a)
+{   
+    _Anders_PrepareRawPixelBuffer(a);
 
     size_t written = fwrite(a->_rawPixelBuffer, 1, a->_PIXEL_DATA_SIZE, a->_FFmpeg);
     if(written != a->_PIXEL_DATA_SIZE)
@@ -234,29 +239,8 @@ void Anders_SaveAsBMP(struct Anders *a)
     fwrite(a->_BMPHeaderBytes, 1, BMP_HEADER_SIZE, fptr);
     fwrite(a->_DIBHeaderBytes, 1, DIB_HEADER_SIZE, fptr);
     
-    // Write pixel data
-    uint8_t *pixelPointer = a->_rawPixelBuffer;
-    for(int32_t y = a->_height - 1; y >= 0; y--) // BMP stores data bottom up
-    {
-        size_t rowStartIndex = y * a->_width;
-        
-        for(uint16_t x = 0; x < a->_width; x++)
-        {
-            struct _Anders_pixel *pixel = &a->_pixels[rowStartIndex + x];
-
-            // Write individual byes for pixels
-            *pixelPointer++ = pixel->b;
-            *pixelPointer++ = pixel->g;
-            *pixelPointer++ = pixel->r;
-        }
-
-        // Pad if needed
-        if(a->_PADDING_BYTES > 0)
-        {
-            memcpy(pixelPointer, PADDING, a->_PADDING_BYTES);
-            pixelPointer += a->_PADDING_BYTES;
-        }
-    }
+    // Prepare pixel data
+    _Anders_PrepareRawPixelBuffer(a);
 
     fwrite(a->_rawPixelBuffer, 1, a->_PIXEL_DATA_SIZE, fptr);
 
