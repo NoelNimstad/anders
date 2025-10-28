@@ -15,16 +15,16 @@ struct _Anders_pixel
 struct Anders
 {
     // public
+    uint16_t BMPCount;
     uint32_t frame;
-    uint16_t shardFrequency;
 
     // private
     struct _Anders_pixel *_pixels;
     uint32_t _width;
     uint32_t _height;
     uint8_t _FPS;
-    uint16_t _shards;
     char *_outputDir;
+    FILE *_FFmpeg;
 
     // BMP
     uint8_t *_BMPHeaderBytes;
@@ -87,11 +87,17 @@ void Anders_Rectangle(struct Anders *a, uint16_t x, uint16_t y, uint16_t width, 
 void Anders_Circle(struct Anders *a, uint16_t x, uint16_t y, uint16_t radius, uint8_t r, uint8_t g, uint8_t b);
 
 /**
- * @brief Saves drawn content as a new frame
+ * @brief Pipes current frame data to FFmpeg
  * 
  * @param a A pointer to the current Anders drawing context
  */
 void Anders_Frame(struct Anders *a);
+/**
+ * @brief Saves current drawing as a BMP file
+ * 
+ * @param a A pointer to the current Anders drawing context
+ */
+void Anders_SaveAsBMP(struct Anders *a);
 /**
  * @brief Pieces together video shards and remaining unsharded frames
  * 

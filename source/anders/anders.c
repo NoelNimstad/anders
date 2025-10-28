@@ -42,7 +42,7 @@ struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t heigh
         goto fail_a;
     }
 
-    char command[0xff];
+    char command[0xff << 2];
     sprintf(command, "rm -r %s", outputDir);
     system(command);
     sprintf(command, "mkdir %s", outputDir);
@@ -51,6 +51,15 @@ struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t heigh
     a->_FPS = FPS;
     a->_width = width;
     a->_height = height;
+    a->_outputDir = outputDir;
+    sprintf(command, "ffmpeg -f rawvideo -pix_fmt bgr24 -s %ux%u -r %d -i - -c:v libx264 -qp 0 %s/anders.mp4", a->_width, a->_height, a->_FPS, a->_outputDir);
+    a->_FFmpeg = popen(command, "w");
+    if(NULL == a->_FFmpeg)
+    {
+        printf("Failed to open pipe to FFmpeg\n");
+        goto fail_ffmpeg;
+    }
+
     a->_pixels = (struct _Anders_pixel *)malloc(a->_width * a->_height * sizeof(struct _Anders_pixel));
     if(NULL == a->_pixels)
     {
@@ -58,10 +67,8 @@ struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t heigh
         goto fail_pixels;
     }
 
+    a->BMPCount = 0;
     a->frame = 0;
-    a->_shards = 0;
-    a->_outputDir = outputDir;
-    a->shardFrequency = 300;
 
     // Compute image header data
     uint32_t ROW_SIZE_IN_BYTES = a->_width * BYTES_PER_PIXEL;
@@ -122,6 +129,7 @@ fail_DIBHeaderBytes:
 fail_BMPHeaderBytes:
     free(a->_pixels);
 fail_pixels:
+fail_ffmpeg:
     free(a);
 fail_a:
     return NULL;
@@ -129,6 +137,8 @@ fail_a:
 
 void Anders_Destroy(struct Anders *a)
 {
+    if(NULL == a) return;
+
     free(a->_pixels);
     free(a->_BMPHeaderBytes);
     free(a->_DIBHeaderBytes);
@@ -145,15 +155,39 @@ void Anders_Clear(struct Anders *a, uint8_t r, uint8_t g, uint8_t b)
     }
 }
 
-static void _Anders_Shard(struct Anders *a)
-{
-    char command[0xff << 2];
-    sprintf(command, "ffmpeg -framerate %d -i %s%s.bmp -c:v libx264 -qp 0 %s_anders_shard%hu.mp4", a->_FPS, a->_outputDir, "%08d", a->_outputDir, a->_shards);
-    system(command);
-    sprintf(command, "rm %s*.bmp", a->_outputDir);
-    system(command);
+void Anders_Frame(struct Anders *a)
+{   
+    uint8_t *pixelPointer = a->_rawPixelBuffer;
+    for(int32_t y = a->_height - 1; y >= 0; y--) // BMP stores data bottom up
+    {
+        size_t rowStartIndex = y * a->_width;
+        
+        for(uint16_t x = 0; x < a->_width; x++)
+        {
+            struct _Anders_pixel *pixel = &a->_pixels[rowStartIndex + x];
 
-    a->_shards++;
+            // Write individual byes for pixels
+            *pixelPointer++ = pixel->b;
+            *pixelPointer++ = pixel->g;
+            *pixelPointer++ = pixel->r;
+        }
+
+        // Pad if needed
+        if(a->_PADDING_BYTES > 0)
+        {
+            memcpy(pixelPointer, PADDING, a->_PADDING_BYTES);
+            pixelPointer += a->_PADDING_BYTES;
+        }
+    }
+
+    size_t written = fwrite(a->_rawPixelBuffer, 1, a->_PIXEL_DATA_SIZE, a->_FFmpeg);
+    if(written != a->_PIXEL_DATA_SIZE)
+    {
+        printf("Failed to pipe full data to FFmpeg on frame %u\n", a->frame);
+    }
+
+    a->frame++;
+    // if(a->frame % a->shardFrequency == 0) _Anders_Shard(a);
 }
 
 /*
@@ -183,11 +217,11 @@ static void _Anders_Shard(struct Anders *a)
     PIXEL DATA
 */
 
-void Anders_Frame(struct Anders *a)
+void Anders_SaveAsBMP(struct Anders *a)
 {
     // Open file
     char filename[0xff];
-    sprintf(filename, "%s%08d.bmp", a->_outputDir, a->frame % a->shardFrequency); 
+    sprintf(filename, "%s%08d.bmp", a->_outputDir, a->BMPCount); 
     FILE *fptr = fopen(filename, "wb");
 
     if(NULL == fptr)
@@ -228,8 +262,7 @@ void Anders_Frame(struct Anders *a)
 
     fclose(fptr);
 
-    a->frame++;
-    if(a->frame % a->shardFrequency == 0) _Anders_Shard(a);
+    a->BMPCount++;
 }
 
 void Anders_Rectangle(struct Anders *a, uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t r, uint8_t g, uint8_t b)
@@ -247,18 +280,12 @@ void Anders_Rectangle(struct Anders *a, uint16_t x, uint16_t y, uint16_t width, 
 
 void Anders_Compose(struct Anders *a)
 {
-    if(a->frame % a->shardFrequency != 0) _Anders_Shard(a);
-
-    char command[0xff << 2];
-    for(size_t i = 0; i < a->_shards; i++)
+    int status = pclose(a->_FFmpeg);
+    if(status != 0)
     {
-        sprintf(command, "echo \"file '_anders_shard%zu.mp4'\" >> %s_anders_shards.txt", i, a->_outputDir);
-        system(command);
+        printf("FFmpeg failed to compose video\n");
     }
-    sprintf(command, "ffmpeg -f concat -i %s_anders_shards.txt -c copy -qp 0 %sanders.mp4", a->_outputDir, a->_outputDir);
-    system(command);
-    sprintf(command, "rm %s_anders_shard*", a->_outputDir);
-    system(command);
+
     return;
 }
 
