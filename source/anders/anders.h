@@ -34,6 +34,14 @@ struct Anders
     uint32_t _PADDING_BYTES;
 };
 
+enum Anders_CompressionSetting
+{
+    ANDERS_COMPRESSION_DEFAULT = 0,
+    ANDERS_COMPRESSION_UNCOMPRESSED = 1,
+    ANDERS_COMPRESSION_SPEED_OPTIMIZED = 2,
+    ANDERS_COMPRESSION_SIZE_OPTIMIZED = 3
+};
+
 /**
  * @brief Initialises the Anders drawing context
  * 
@@ -43,7 +51,7 @@ struct Anders
  * @param FPS Video framerate
  * @return `struct Anders*`: A pointer towards to an Anders drawing context
  */
-struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t height, uint8_t FPS);
+struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t height, uint8_t FPS, enum Anders_CompressionSetting compression);
 /**
  * @brief Destroys the current Anders drawing context
  * 

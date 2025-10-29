@@ -4,7 +4,7 @@
 
 int main(void)
 {
-    struct Anders *a = Anders_Initialise("render/", 3024, 1964, 60);
+    struct Anders *a = Anders_Initialise("render/", 3024, 1964, 60, ANDERS_COMPRESSION_SPEED_OPTIMIZED);
     if(NULL == a)
     {
         return 1;
@@ -18,7 +18,7 @@ int main(void)
         Anders_Frame(a);
     }
 
-    Anders_SaveAsBMP(a);
+    // Anders_SaveAsBMP(a);
 
     Anders_Compose(a);
     Anders_Destroy(a);

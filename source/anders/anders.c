@@ -25,7 +25,15 @@ const uint16_t COLOR_PLANES         = 1;
 
 const uint8_t PADDING[3] = { 0x00, 0x00, 0x00 }; // Max 3 bytes padding
 
-struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t height, uint8_t FPS)
+static const char *_Anders_CompressionStrings[] =
+{
+    "-c:v libx264 -preset medium -crf 23",      // Default
+    "-c:v ffv1 -level 3 -threads 8",            // Uncompressed
+    "-c:v libx264 -preset ultrafast -crf 28",   // Speed optimized
+    "-c:v libx264 -preset veryslow -crf 18"     // Size optimized
+};
+
+struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t height, uint8_t FPS, enum Anders_CompressionSetting compression)
 {
     printf("Are you sure \"%s\" is your desired output directory? The directory's content will be cleared! (y/N) ", outputDir);
     char response;
@@ -52,7 +60,10 @@ struct Anders *Anders_Initialise(char *outputDir, uint32_t width, uint32_t heigh
     a->_width = width;
     a->_height = height;
     a->_outputDir = outputDir;
-    sprintf(command, "ffmpeg -f rawvideo -pix_fmt bgr24 -s %ux%u -r %d -i - -c:v libx264 -qp 0 %s/anders.mp4", a->_width, a->_height, a->_FPS, a->_outputDir);
+    sprintf(command, "ffmpeg -f rawvideo -pix_fmt bgr24 -s %ux%u -r %d -i - %s %s/anders.mp4",
+                     a->_width, a->_height, a->_FPS,
+                     _Anders_CompressionStrings[compression],
+                     a->_outputDir);
     a->_FFmpeg = popen(command, "w");
     if(NULL == a->_FFmpeg)
     {
@@ -192,7 +203,6 @@ void Anders_Frame(struct Anders *a)
     }
 
     a->frame++;
-    // if(a->frame % a->shardFrequency == 0) _Anders_Shard(a);
 }
 
 /*
