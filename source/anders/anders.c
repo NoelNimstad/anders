@@ -166,12 +166,14 @@ void Anders_Clear(struct Anders *a, uint8_t r, uint8_t g, uint8_t b)
     }
 }
 
-static void _Anders_PrepareRawPixelBuffer(struct Anders *a)
+#define TOP_TO_BOTTOM   0
+#define BOTTOM_TO_TOP   1
+static void _Anders_PrepareRawPixelBuffer(struct Anders *a, uint8_t order)
 {
     uint8_t *pixelPointer = a->_rawPixelBuffer;
     for(int32_t y = a->_height - 1; y >= 0; y--) // BMP stores data bottom up
     {
-        size_t rowStartIndex = y * a->_width;
+        size_t rowStartIndex = (order == TOP_TO_BOTTOM ? a->_height - 1 - y : y) * a->_width;
         
         for(uint16_t x = 0; x < a->_width; x++)
         {
@@ -194,7 +196,7 @@ static void _Anders_PrepareRawPixelBuffer(struct Anders *a)
 
 void Anders_Frame(struct Anders *a)
 {   
-    _Anders_PrepareRawPixelBuffer(a);
+    _Anders_PrepareRawPixelBuffer(a, TOP_TO_BOTTOM);
 
     size_t written = fwrite(a->_rawPixelBuffer, 1, a->_PIXEL_DATA_SIZE, a->_FFmpeg);
     if(written != a->_PIXEL_DATA_SIZE)
@@ -250,7 +252,7 @@ void Anders_SaveAsBMP(struct Anders *a)
     fwrite(a->_DIBHeaderBytes, 1, DIB_HEADER_SIZE, fptr);
     
     // Prepare pixel data
-    _Anders_PrepareRawPixelBuffer(a);
+    _Anders_PrepareRawPixelBuffer(a, BOTTOM_TO_TOP);
 
     fwrite(a->_rawPixelBuffer, 1, a->_PIXEL_DATA_SIZE, fptr);
 
@@ -305,5 +307,93 @@ void Anders_Circle(struct Anders *a, uint16_t x, uint16_t y, uint16_t radius, ui
                 a->_pixels[px + py * a->_width] = targetPixel;
             }
         }
+    }
+}
+
+static void _Anders_DrawFlatTrianglePart(struct Anders *a, int y_start, int y_end,
+                                       int x_a_start, int y_a_start, int x_a_end, int y_a_end,
+                                       int x_b_start, int y_b_start, int x_b_end, int y_b_end,
+                                       struct _Anders_pixel targetPixel)
+{   
+    float h_a = (float)(y_a_end - y_a_start);
+    float h_b = (float)(y_b_end - y_b_start);
+    if(h_a == 0.0f || h_b == 0.0f) return; // Check that the triangle is valid
+
+    // Loop through all scanlines in this part
+    for(int y = y_start; y < y_end; y++)
+    {
+        if(y < 0 || y >= a->_height) continue; // Prevent drawing outside the screen
+
+        float t_a = (float)(y - y_a_start) / h_a;
+        float t_b = (float)(y - y_b_start) / h_b;
+
+        float x_a = x_a_start + (x_a_end - x_a_start) * t_a;
+        float x_b = x_b_start + (x_b_end - x_b_start) * t_b; // Interpolation
+
+        int xLeft = (int)fminf(x_a, x_b);
+        int xRight = (int)fmaxf(x_a, x_b);
+        
+        xLeft = (int)fmaxf(0, xLeft);
+        xRight = (int)fminf(a->_width - 1, xRight); // Compute left and right x coordinate for current scan line
+        
+        size_t startIndex = (size_t)y * a->_width;
+        for (int x = xLeft; x <= xRight; x++)
+        {
+            a->_pixels[startIndex + x] = targetPixel; // Rasterize line
+        }
+    }
+}
+void Anders_Triangle(struct Anders *a, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, uint8_t r, uint8_t g, uint8_t b)
+{
+    struct _Anders_pixel targetPixel = { .r = r, .g = g, .b = b };
+
+    int vx[3] = { (int)x1, (int)x2, (int)x3 };
+    int vy[3] = { (int)y1, (int)y2, (int)y3 };
+
+    // Ensure v0 is the smallest number
+    if(vy[0] > vy[1])
+    {
+        int ty = vy[0]; vy[0] = vy[1]; vy[1] = ty;
+        int tx = vx[0]; vx[0] = vx[1]; vx[1] = tx;
+    }
+
+    if(vy[0] > vy[2])
+    {
+        int ty = vy[0]; vy[0] = vy[2]; vy[2] = ty;
+        int tx = vx[0]; vx[0] = vx[2]; vx[2] = tx;
+    }
+
+    // Sort v1 and v2
+    if(vy[1] > vy[2])
+    {
+        int ty = vy[1]; vy[1] = vy[2]; vy[2] = ty;
+        int tx = vx[1]; vx[1] = vx[2]; vx[2] = tx;
+    }
+
+    if(vy[0] == vy[2]) return; // Since v0 <= v1 <= v2, if y0 == y1 then the triangle is flat
+    
+    float tSplit = (float)(vy[1] - vy[0]) / (vy[2] - vy[0]);
+    int xSplit = (int)(vx[0] + (vx[2] - vx[0]) * tSplit);
+
+    // Rasterize top half (0, 1, split)
+    if(vy[0] != vy[1])
+    {
+        _Anders_DrawFlatTrianglePart(a, 
+            vy[0],
+            vy[1],
+            vx[0], vy[0], vx[2], vy[2],
+            vx[0], vy[0], vx[1], vy[1],
+            targetPixel);
+    }
+
+    // Rasterize bottom half (1, split, 2)
+    if(vy[1] != vy[2])
+    {
+        _Anders_DrawFlatTrianglePart(a, 
+            vy[1],
+            vy[2],
+            xSplit, vy[1], vx[2], vy[2],
+            vx[1], vy[1], vx[2], vy[2],
+            targetPixel);
     }
 }

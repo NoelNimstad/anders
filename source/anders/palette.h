@@ -1,14 +1,12 @@
-#ifndef PALETTE_H
-#define PALETTE_H
+#ifndef ANDERS_PALETTE_H
+#define ANDERS_PALETTE_H
 
 #include <stdlib.h>
 #include "anders.h"
 
 struct Anders_Color
 {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+    uint8_t r, g, b;
 };
 /**
  * @brief Makes a color with the same red, green and blue values.
@@ -73,6 +71,19 @@ inline struct Anders_Color Anders_Palette_InvertColor(struct Anders_Color color)
  * @param _c The color to draw with
  */
 #define Anders_Palette_Circle(_a, _x, _y, _r, _c) Anders_Circle((_a), (_x), (_y), (_r), (_c).r, (_c).g, (_c).b)
+/**
+ * @brief Draws a triangle with a color
+ * 
+ * @param a A pointer to the current Anders drawing context
+ * @param x1 X coordinate of vertex 1
+ * @param y1 Y coordinate of vertex 1
+ * @param x2 X coordinate of vertex 2
+ * @param y2 Y coordinate of vertex 2
+ * @param x3 X coordinate of vertex 3
+ * @param y3 Y coordinate of vertex 3
+ * @param _c The color to draw with
+ */
+#define Anders_Palette_Triangle(_a, _x1, _y1, _x2, _y2, _x3, _y3, _c) Anders_Triangle((_a), (_x1), (_y1), (_x2), (_y2), (_x3), (_y3), (_c).r, (_c).g, (_c).b)
 
 #define GOOGLE_BLUE_MEDIUM      0
 #define GOOGLE_RED_MEDIUM       1
@@ -80,4 +91,4 @@ inline struct Anders_Color Anders_Palette_InvertColor(struct Anders_Color color)
 #define GOOGLE_GREEN_MEDIUM     3
 struct Anders_Color GooglePalette[] = { { 66, 103, 210 }, { 234, 67, 53 }, { 251, 188, 4 }, { 52, 168, 83 } };
 
-#endif // PALETTE_H
+#endif // ANDERS_PALETTE_H

@@ -4,12 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 struct _Anders_pixel
 {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+    uint8_t r, g, b;
 };
 
 struct Anders
@@ -93,6 +92,21 @@ void Anders_Rectangle(struct Anders *a, uint16_t x, uint16_t y, uint16_t width, 
  * @param b Blue
  */
 void Anders_Circle(struct Anders *a, uint16_t x, uint16_t y, uint16_t radius, uint8_t r, uint8_t g, uint8_t b);
+/**
+ * @brief Draws a triangle
+ * 
+ * @param a A pointer to the current Anders drawing context
+ * @param x1 X coordinate of vertex 1
+ * @param y1 Y coordinate of vertex 1
+ * @param x2 X coordinate of vertex 2
+ * @param y2 Y coordinate of vertex 2
+ * @param x3 X coordinate of vertex 3
+ * @param y3 Y coordinate of vertex 3
+ * @param r Red
+ * @param g Green
+ * @param b Blue
+ */
+void Anders_Triangle(struct Anders *a, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, uint8_t r, uint8_t g, uint8_t b);
 
 /**
  * @brief Pipes current frame data to FFmpeg
